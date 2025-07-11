@@ -1,0 +1,30 @@
+module:
+  _target_: tgexp.tile2vec.Tile2VecModule
+  backbone: resnet18
+  in_channels: 4
+  pretrained: True
+  margin: 10
+  l2: 0.01
+  lr: 1E-3
+
+datamodule:
+  _target_: tgexp.tile2vec.Tile2VecDataModule
+  root: /data/tile2vec/triplets
+  img_type: naip
+  bands: 4
+  batch_size: 128
+  num_workers: 8
+  n_triplets: 100000
+  pairs_only: True
+
+logger:
+  _target_: lightning.pytorch.loggers.WandbLogger
+  project: tile2vec
+
+trainer:
+  _target_: lightning.Trainer
+  max_epochs: 50
+  accelerator: gpu
+  devices: 1
+  logger: ${logger}
+
