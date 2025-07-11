@@ -1,0 +1,34 @@
+[project]
+name = "torchgeo-experimental"
+version = "0.1.0"
+description = "Some TorchGeo Experimental Ideas and Training/Inference Code"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "torchgeo[all]",
+    "tqdm>=4.67.1",
+    "wandb>=0.21.0",
+]
+
+[tool.uv.sources]
+torchgeo = { git = "https://github.com/microsoft/torchgeo", rev = "86da0ee97c548dddae033a32ffab1573679262ed" }
+
+[tool.ruff]
+fix = true
+
+[tool.ruff.format]
+quote-style = "double"
+skip-magic-trailing-comma = true
+
+[tool.ruff.lint]
+extend-select = ["ANN", "I", "RUF", "UP"]
+ignore = ["ANN401"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
