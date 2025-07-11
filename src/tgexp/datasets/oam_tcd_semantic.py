@@ -2,6 +2,7 @@ import os
 from collections.abc import Callable
 from typing import Literal
 
+import kornia.augmentation as K
 import lightning
 import numpy as np
 import torch
@@ -9,6 +10,7 @@ import torchvision.transforms.v2 as T
 from PIL import Image
 from pycocotools.coco import COCO
 from torch.utils.data import DataLoader, Dataset, Subset
+from torchgeo.transforms.transforms import _ExtractPatches
 from torchvision import tv_tensors
 
 from .utils import dataset_split
@@ -43,13 +45,8 @@ def load_train_transforms(patch_size: int) -> T.Compose:
     )
 
 
-def load_eval_transforms(patch_size: int) -> T.Compose:
-    return T.Compose(
-        [
-            T.CenterCrop(size=(patch_size, patch_size)),
-            T.ToDtype(torch.float32, scale=True),
-        ]
-    )
+def load_eval_transforms() -> T.Compose:
+    return T.Compose([T.ToDtype(torch.float32, scale=True)])
 
 
 class OAMTCDSemanticSegmentation(Dataset):
@@ -100,6 +97,7 @@ class OAMTCDSemanticSegmentationDataModule(lightning.LightningDataModule):
         num_workers: int = 4,
         patch_size: int = 1024,
         val_split_pct: float = 0.1,
+        eval_batch_size: int = 4,
         train_transforms: Callable | None = None,
         val_transforms: Callable | None = None,
         test_transforms: Callable | None = None,
@@ -111,25 +109,23 @@ class OAMTCDSemanticSegmentationDataModule(lightning.LightningDataModule):
         self.num_workers = num_workers
         self.patch_size = patch_size
         self.val_split_pct = val_split_pct
+        self.eval_batch_size = eval_batch_size
         self.train_transforms = (
             load_train_transforms(patch_size)
             if train_transforms is None
             else train_transforms
         )
         self.val_transforms = (
-            load_eval_transforms(patch_size)
-            if val_transforms is None
-            else val_transforms
+            load_eval_transforms() if val_transforms is None else val_transforms
         )
         self.test_transforms = (
-            load_eval_transforms(patch_size)
-            if test_transforms is None
-            else test_transforms
+            load_eval_transforms() if test_transforms is None else test_transforms
         )
         self.predict_transforms = (
-            load_eval_transforms(patch_size)
-            if predict_transforms is None
-            else predict_transforms
+            load_eval_transforms() if predict_transforms is None else predict_transforms
+        )
+        self.patchify = K.AugmentationSequential(
+            _ExtractPatches(window_size=patch_size), data_keys=None, same_on_batch=True
         )
 
     def setup(self, stage: str | None = None) -> None:
@@ -165,7 +161,7 @@ class OAMTCDSemanticSegmentationDataModule(lightning.LightningDataModule):
     def val_dataloader(self) -> DataLoader:
         return DataLoader(
             self.val_dataset,
-            batch_size=self.batch_size,
+            batch_size=self.eval_batch_size,
             shuffle=False,
             num_workers=self.num_workers,
         )
@@ -173,12 +169,23 @@ class OAMTCDSemanticSegmentationDataModule(lightning.LightningDataModule):
     def test_dataloader(self) -> DataLoader:
         return DataLoader(
             self.test_dataset,
-            batch_size=self.batch_size,
+            batch_size=self.eval_batch_size,
             shuffle=False,
             num_workers=self.num_workers,
         )
 
     def predict_dataloader(self) -> DataLoader:
         return DataLoader(
-            self.predict_dataset, batch_size=1, shuffle=False, num_workers=1
+            self.predict_dataset,
+            batch_size=self.eval_batch_size,
+            shuffle=False,
+            num_workers=1,
         )
+
+    def on_after_batch_transfer(
+        self, batch: dict[str, torch.Tensor], dataloader_idx: int
+    ) -> dict[str, torch.Tensor]:
+        if not self.trainer.training:
+            batch = self.patchify(batch)
+
+        return batch

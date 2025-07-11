@@ -1,0 +1,9 @@
+datamodule:
+  _target_: tgexp.datamodules.OAMTCDSegmentationDataModule
+  root: /data/oam-tcd
+  patch_size: 1024
+  batch_size: 32
+  num_workers: 8
+
+module:
+  _target_: tgexp.modules.SemanticSegmentationModule
