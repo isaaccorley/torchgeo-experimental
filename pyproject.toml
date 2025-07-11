@@ -31,4 +31,4 @@ ignore = ["ANN401"]
 split-on-trailing-comma = false
 
 [tool.ruff.lint.pydocstyle]
-convention = "numpy"
+convention = "google"
